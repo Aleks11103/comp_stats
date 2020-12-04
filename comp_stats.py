@@ -1,4 +1,5 @@
 import psutil
+import re
 
 TEMPLATES = {
     'memory':{
@@ -8,8 +9,10 @@ TEMPLATES = {
         'total': 'Размер файла подкачки: {:.4} ГБ\n'
     },
     'disks': {
-        'disk_c': 'Диск С: \n\tРазмер: {:.4} ГБ, \n\tЗанято: {:.4} ГБ, \n\tСвободно: {:.4}ГБ\n',
+        'yes' : 'Диск {}, \n\topts: {},\n\tТип файловой системы: {}, \n\tРазмер: {:.4} ГБ, \n\tЗанято: {:.4} ГБ, {:.4}%, \n\tСвободно: {:.4}ГБ\n',
+        'no' : 'Диск {}, \n\topts: {}\n'
     }
+    
 }
 
 #   Получение данных об оперативной памяти
@@ -32,16 +35,18 @@ def get_disks():
             'usage': {}
         }
     for disk in psutil.disk_partitions():
-        res['diskpart']['device'].append(disk.device)
+        s = re.match(r'.*([:\\/]?[a-z|A-Z]+[:\\/]?).*', disk.device)
+        s = s.group(1)
+        res['diskpart']['device'].append(s)
         res['diskpart']['fstype'].append(disk.fstype)
         res['diskpart']['opts'].append(disk.opts)
     for i, disk in enumerate(res['diskpart']['device']):
         if res['diskpart']['fstype'][i] != '':
-            res['usage'][disk[0]] = {}
-            res['usage'][disk[0]]['total'] = psutil.disk_usage(path=disk[:2]).total / 1024 / 1024 / 1024
-            res['usage'][disk[0]]['used'] = psutil.disk_usage(disk).used / 1024 / 1024 / 1024
-            res['usage'][disk[0]]['free'] = psutil.disk_usage(disk).free / 1024 / 1024 / 1024
-            res['usage'][disk[0]]['percent'] = psutil.disk_usage(disk).percent
+            res['usage'][disk] = {}
+            res['usage'][disk]['total'] = psutil.disk_usage(path=disk).total / 1024 / 1024 / 1024
+            res['usage'][disk]['used'] = psutil.disk_usage(disk).used / 1024 / 1024 / 1024
+            res['usage'][disk]['free'] = psutil.disk_usage(disk).free / 1024 / 1024 / 1024
+            res['usage'][disk]['percent'] = psutil.disk_usage(disk).percent
     return res
 
 def show():
@@ -53,8 +58,14 @@ def show():
     print(template_memory)
     # Представление данных по информации дискового пространства
     partitions = get_disks()
-    print(partitions)
-
+    for i in range(len(partitions['diskpart']['device'])):
+        part_str = ''
+        disk = partitions['diskpart']['device'][i]
+        if partitions['diskpart']['fstype'][i] != '':
+            part_str = TEMPLATES['disks']['yes'].format(disk, partitions['diskpart']['opts'][i], partitions['diskpart']['fstype'][i], partitions['usage'][disk]['total'], partitions['usage'][disk]['used'], partitions['usage'][disk]['percent'], partitions['usage'][disk]['free'])
+        else:
+            part_str = TEMPLATES['disks']['no'].format(disk, partitions['diskpart']['opts'][i])
+        print(part_str)
 
 if __name__ == "__main__":
     show()
