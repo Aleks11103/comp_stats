@@ -14,8 +14,8 @@ TEMPLATES = {
         'no' : 'Диск {}, \n\topts: {}\n'
     },
     # pid, name, status, username, create_time
-    'process': '|{:<6}|{:<70}|{:<10}|{:<30}|{:<20}|'
-    
+    'process': '|{:<6}|{:<70}|{:<10}|{:<30}|{:<20}|',
+    'network': '\tотправлено: {}  MB, \n\tпринято: {} MB, \n\tотправлено пакетов: {}, \n\tпринято пакетов: {}'
 }
 
 #   Получение данных об оперативной памяти
@@ -67,11 +67,22 @@ def get_process():
         }
     return res
 
+def get_network():
+    net = psutil.net_io_counters()
+    res = {
+            'bytes_sent': net.bytes_sent / 1024 / 1024,
+            'bytes_recv': net.bytes_recv /1024 / 1024,
+            'packets_sent': net.packets_sent,
+            'packets_recv': net.packets_recv
+        }
+    return res
+
 def show():
     #   Представление данных об оперативной памяти
     memory = get_memory()
+    template_memory = ''
     for key in memory.keys():
-        template_memory = TEMPLATES['memory'][key].format(memory[key])
+        template_memory += TEMPLATES['memory'][key].format(memory[key])
     print(template_memory)
     # Представление данных по информации дискового пространства
     partitions = get_disks()
@@ -90,6 +101,12 @@ def show():
     for i in process:
         proc_str = TEMPLATES['process'].format(i, process[i]['name'], process[i]['status'], process[i]['username'], process[i]['create_time'])
         print(proc_str)
+    # Прдставление данных о сети
+    network = get_network()
+    print('\n\nСтатистика по сетевым данным:')
+    net_str = TEMPLATES['network'].format(round(network['bytes_sent'], 2), round(network['bytes_recv'], 2), network['packets_sent'], network['packets_recv'])
+    print(net_str)
+
 
 if __name__ == "__main__":
     show()
