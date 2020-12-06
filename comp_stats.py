@@ -1,5 +1,6 @@
 import psutil
 import re
+import time
 
 TEMPLATES = {
     'memory':{
@@ -9,9 +10,11 @@ TEMPLATES = {
         'total': 'Размер файла подкачки: {:.4} ГБ\n'
     },
     'disks': {
-        'yes' : 'Диск {}, \n\topts: {},\n\tТип файловой системы: {}, \n\tРазмер: {:.4} ГБ, \n\tЗанято: {:.4} ГБ, {:.4}%, \n\tСвободно: {:.4}ГБ\n',
+        'yes': 'Диск {}, \n\topts: {},\n\tТип файловой системы: {}, \n\tРазмер: {:.4} ГБ, \n\tЗанято: {:.4} ГБ, {:.4}%, \n\tСвободно: {:.4}ГБ\n',
         'no' : 'Диск {}, \n\topts: {}\n'
-    }
+    },
+    # pid, name, status, username, create_time
+    'process': '|{:<6}|{:<70}|{:<10}|{:<30}|{:<20}|'
     
 }
 
@@ -49,23 +52,44 @@ def get_disks():
             res['usage'][disk]['percent'] = psutil.disk_usage(disk).percent
     return res
 
+def get_process():
+    res = {}
+    for proc in psutil.process_iter():
+        d = proc.as_dict(attrs=['pid', 'name', 'username', 'status', 'create_time'])
+        d['create_time'] = time.strftime("%d-%m-%Y %H:%M:%S", time.localtime(d['create_time']))
+        if d['username'] == None:
+            d['username'] = 'None'
+        res[d['pid']] = {
+            'name': d['name'],
+            'username': d['username'],
+            'status': d['status'],
+            'create_time': d['create_time']
+        }
+    return res
+
 def show():
     #   Представление данных об оперативной памяти
     memory = get_memory()
-    template_memory = ""
     for key in memory.keys():
-        template_memory += TEMPLATES['memory'][key].format(memory[key])
+        template_memory = TEMPLATES['memory'][key].format(memory[key])
     print(template_memory)
     # Представление данных по информации дискового пространства
     partitions = get_disks()
     for i in range(len(partitions['diskpart']['device'])):
-        part_str = ''
         disk = partitions['diskpart']['device'][i]
         if partitions['diskpart']['fstype'][i] != '':
             part_str = TEMPLATES['disks']['yes'].format(disk, partitions['diskpart']['opts'][i], partitions['diskpart']['fstype'][i], partitions['usage'][disk]['total'], partitions['usage'][disk]['used'], partitions['usage'][disk]['percent'], partitions['usage'][disk]['free'])
         else:
             part_str = TEMPLATES['disks']['no'].format(disk, partitions['diskpart']['opts'][i])
         print(part_str)
+    # Представление данных о процессах
+    process = get_process()
+    print('-' * 142)
+    print('|{:^6}|{:^70}|{:^10}|{:^30}|{:^20}|'.format('pid', 'name', 'status', 'username', 'create_time'))
+    print('-' * 142)
+    for i in process:
+        proc_str = TEMPLATES['process'].format(i, process[i]['name'], process[i]['status'], process[i]['username'], process[i]['create_time'])
+        print(proc_str)
 
 if __name__ == "__main__":
     show()
