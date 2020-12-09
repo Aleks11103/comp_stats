@@ -15,7 +15,8 @@ TEMPLATES = {
     },
     # pid, name, status, username, create_time
     'process': '|{:<6}|{:<70}|{:<10}|{:<30}|{:<20}|',
-    'network': '\tотправлено: {}  MB, \n\tпринято: {} MB, \n\tотправлено пакетов: {}, \n\tпринято пакетов: {}'
+    'network': '\tотправлено: {}  MB, \n\tпринято: {} MB, \n\tотправлено пакетов: {}, \n\tпринято пакетов: {}',
+    'network_interface': '\nСетевой интерфейс: {} \n\taddress: {}, \n\tnetmask: {}, \n\tbroadcast: {}'
 }
 
 #   Получение данных об оперативной памяти
@@ -46,9 +47,9 @@ def get_disks():
     for i, disk in enumerate(res['diskpart']['device']):
         if res['diskpart']['fstype'][i] != '':
             res['usage'][disk] = {}
-            res['usage'][disk]['total'] = psutil.disk_usage(path=disk).total / 1024 / 1024 / 1024
-            res['usage'][disk]['used'] = psutil.disk_usage(disk).used / 1024 / 1024 / 1024
-            res['usage'][disk]['free'] = psutil.disk_usage(disk).free / 1024 / 1024 / 1024
+            res['usage'][disk]['total'] = round(psutil.disk_usage(path=disk).total / 1024 / 1024 / 1024, 4)
+            res['usage'][disk]['used'] = round(psutil.disk_usage(disk).used / 1024 / 1024 / 1024, 4)
+            res['usage'][disk]['free'] = round(psutil.disk_usage(disk).free / 1024 / 1024 / 1024, 4)
             res['usage'][disk]['percent'] = psutil.disk_usage(disk).percent
     return res
 
@@ -69,12 +70,19 @@ def get_process():
 
 def get_network():
     net = psutil.net_io_counters()
+    net_int = psutil.net_if_addrs()
     res = {
-            'bytes_sent': net.bytes_sent / 1024 / 1024,
-            'bytes_recv': net.bytes_recv /1024 / 1024,
+            'bytes_sent': round(net.bytes_sent / 1024 / 1024, 4),
+            'bytes_recv': round(net.bytes_recv /1024 / 1024, 4),
             'packets_sent': net.packets_sent,
             'packets_recv': net.packets_recv
         }
+    for i in net_int:
+        res['network_interface'] = i
+        res['ip'] = net_int[i][1][1]
+        res['netmask'] = net_int[i][1][2]
+        res['broadcast'] = net_int[i][1][3]
+        break
     return res
 
 def show():
@@ -104,9 +112,9 @@ def show():
     # Прдставление данных о сети
     network = get_network()
     print('\n\nСтатистика по сетевым данным:')
-    net_str = TEMPLATES['network'].format(round(network['bytes_sent'], 2), round(network['bytes_recv'], 2), network['packets_sent'], network['packets_recv'])
+    net_str = TEMPLATES['network'].format(network['bytes_sent'], network['bytes_recv'], network['packets_sent'], network['packets_recv'])
+    net_str += TEMPLATES['network_interface'].format(network['network_interface'], network['ip'], network['netmask'], network['broadcast'])
     print(net_str)
-
 
 if __name__ == "__main__":
     show()
